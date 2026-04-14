@@ -41,6 +41,12 @@ function getIndexColor(value: number, isGreenery: boolean): string {
   }
 }
 
+function getRiskColor(risk: number): string {
+  if (risk >= 0.65) return "#dc2626";
+  if (risk >= 0.35) return "#ca8a04";
+  return "#16a34a";
+}
+
 export default function PropertyCard({ property, index }: PropertyCardProps) {
   const isBestDeal = index === 0;
   const isTopThree = index < 3;
@@ -407,6 +413,157 @@ export default function PropertyCard({ property, index }: PropertyCardProps) {
                       {property.locationIndices.trafficCongestionIndex}%
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Agentic Evaluation Summary */}
+            {property.agenticEvaluation && (
+              <div
+                style={{
+                  marginTop: "12px",
+                  padding: "10px 12px",
+                  borderRadius: "8px",
+                  background: "linear-gradient(135deg, rgba(59,130,246,0.05) 0%, rgba(99,102,241,0.06) 100%)",
+                  border: "1px solid rgba(59,130,246,0.18)",
+                }}
+              >
+                <div className="flex items-center" style={{ gap: "6px", marginBottom: "8px" }}>
+                  <svg style={{ width: "14px", height: "14px" }} fill="#2563eb" viewBox="0 0 24 24">
+                    <path d="M12 2l2.09 6.26H20l-4.95 3.6L16.91 18 12 14.7 7.09 18l1.86-6.14L4 8.26h5.91L12 2z" />
+                  </svg>
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      color: "#2563eb",
+                      letterSpacing: "0.03em",
+                    }}
+                  >
+                    AGENTIC INSIGHTS
+                  </span>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                  <div>
+                    <div style={{ fontSize: "9px", color: "#64748b", marginBottom: "2px" }}>
+                      Fair Value
+                    </div>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: "#1e293b" }}>
+                      ₹{property.agenticEvaluation.fairValue.fairPrice.toLocaleString("en-IN")}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color:
+                          property.agenticEvaluation.fairValue.deltaVsListed <= 0 ? "#16a34a" : "#dc2626",
+                      }}
+                    >
+                      {property.agenticEvaluation.fairValue.deltaVsListed > 0 ? "+" : ""}
+                      {property.agenticEvaluation.fairValue.deltaVsListed}% vs listed
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: "9px", color: "#64748b", marginBottom: "2px" }}>
+                      24M Forecast
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        color:
+                          property.agenticEvaluation.forecast.projectedReturnPct >= 0
+                            ? "#16a34a"
+                            : "#dc2626",
+                      }}
+                    >
+                      {property.agenticEvaluation.forecast.projectedReturnPct > 0 ? "+" : ""}
+                      {property.agenticEvaluation.forecast.projectedReturnPct}%
+                    </div>
+                    <div style={{ fontSize: "10px", color: "#64748b" }}>Projected return</div>
+                  </div>
+
+                  <div>
+                    <div style={{ fontSize: "9px", color: "#64748b", marginBottom: "2px" }}>
+                      Fraud Risk
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        color: getRiskColor(property.agenticEvaluation.fraudRisk[0]?.riskScore ?? 0),
+                      }}
+                    >
+                      {Math.round((property.agenticEvaluation.fraudRisk[0]?.riskScore ?? 0) * 100)}%
+                    </div>
+                    <div style={{ fontSize: "10px", color: "#64748b" }}>Cluster alert score</div>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: "8px",
+                    fontSize: "11px",
+                    color: "#334155",
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {property.agenticEvaluation.recommendation}
+                </div>
+
+                <div
+                  style={{
+                    marginTop: "6px",
+                    fontSize: "10px",
+                    color: property.agenticEvaluation.accuracy.isHighConfidence
+                      ? "#0f766e"
+                      : "#92400e",
+                    fontWeight: 600,
+                  }}
+                >
+                  Insight confidence: {Math.round(property.agenticEvaluation.accuracy.overallConfidence * 100)}%
+                  {property.agenticEvaluation.accuracy.isHighConfidence ? " (high)" : " (use with caution)"}
+                </div>
+
+                <div
+                  style={{
+                    marginTop: "8px",
+                    fontSize: "10px",
+                    color: "#475569",
+                  }}
+                >
+                  Suggested counter-offer: ₹
+                  {property.agenticEvaluation.negotiation.counterOfferPrice.toLocaleString("en-IN")}
+                  {" "}
+                  ({property.agenticEvaluation.negotiation.discountPct}% below listed)
+                </div>
+              </div>
+            )}
+
+            {!property.agenticEvaluation && property.agenticSuppressedReason && (
+              <div
+                style={{
+                  marginTop: "12px",
+                  padding: "10px 12px",
+                  borderRadius: "8px",
+                  background: "rgba(245,158,11,0.08)",
+                  border: "1px solid rgba(245,158,11,0.22)",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: "#92400e",
+                    letterSpacing: "0.03em",
+                    marginBottom: "4px",
+                  }}
+                >
+                  AGENTIC INSIGHTS WITHHELD
+                </div>
+                <div style={{ fontSize: "10px", color: "#78350f", lineHeight: 1.4 }}>
+                  {property.agenticSuppressedReason}
                 </div>
               </div>
             )}

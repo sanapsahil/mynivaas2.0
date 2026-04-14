@@ -158,6 +158,7 @@ Aggregates real-estate listings and enriches them with AI signals.
 - `propertyType` (default: `apartment`)
 - `listingType` (default: `rent`) — `buy | rent | pg`
 - `bhk` (default: `any`)
+- `strictAgentic` (optional, default: `true`) — when `true`, low-confidence agentic insights are suppressed
 
 **Behavior**
 - Searches multiple domains via SerpAPI
@@ -169,6 +170,16 @@ Aggregates real-estate listings and enriches them with AI signals.
 
 **Returns**
 - `results[]`, `total`, `query`, `center`
+- Each result may include `agenticEvaluation` with:
+	- `fairValue` (fair price, delta vs listed, feature contributions)
+	- `forecast` (12-24 month projected return and points)
+	- `fraudRisk` (cluster risk score)
+	- `sentiment` (external sentiment signal)
+	- `negotiation` (counter-offer suggestion + drafted message)
+	- `recommendation` (final actionable summary)
+	- `accuracy` (confidence, strict-check pass/fail, failed checks, source-level confidence)
+- If strict mode suppresses uncertain insights, result includes:
+	- `agenticSuppressedReason`
 
 ---
 
@@ -296,3 +307,83 @@ Image scraping and snippet parsing depend on third-party site structure and can 
 - Replace heuristic scoring with trained CV models
 - Add caching/rate-limit guards for third-party API and scraping layers
 - Add unit/integration tests for parsers and route handlers
+
+---
+
+## 11) Agentic AI Modules Added (Phase 1)
+
+The following previously-missing capabilities are now implemented as backend modules and APIs:
+
+- Multi-agent orchestration (planner + evaluator + report synthesis)
+- Dedicated negotiator agent (counter-offer drafting with defect-aware reasoning)
+- Trust & safety fraud clustering (graph-style relationship scoring)
+- Fair-price valuation with feature contribution explainability
+- 12-24 month forecasting (LSTM/GRU surrogate forecasting module)
+- Automated virtual staging pipeline hook (Stable Diffusion provider adapter)
+- Multimodal RAG retrieval (text + optional image query)
+- Production vector-DB adapter layer (Pinecone adapter + pluggable fallback)
+- Graph DB sync adapter for Neo4j
+- Agentic scraping module (behavioral fetch + optional LLM field extraction)
+- External sentiment fusion module (reddit-based signal ingestion)
+- Autonomous proactive workflow runner (goal-first planner loop)
+
+---
+
+## 12) New Agentic API Endpoints
+
+### `POST /api/agentic/plan`
+Builds a decomposed multi-agent task plan from a user goal.
+
+### `POST /api/agentic/evaluate`
+Runs agentic evaluation for a property (valuation, risk, forecast, sentiment, negotiation).
+
+### `GET /api/agentic/scrape?url=...`
+Runs agentic scraping with heuristic + optional LLM extraction.
+
+### `GET /api/agentic/sentiment?query=...`
+Returns fused external sentiment for locality/developer search terms.
+
+### `POST /api/agentic/stage-room`
+Runs virtual staging adapter (uses provider if configured, otherwise simulated response).
+
+### `POST /api/agentic/rag/query`
+Runs multimodal retrieval over indexed docs with optional image query.
+
+### `POST /api/agentic/vector/upsert`
+Upserts vectors to configured vector database adapter.
+
+### `POST /api/agentic/vector/query`
+Queries vectors from configured vector database adapter.
+
+### `POST /api/agentic/graph/sync`
+Upserts nodes and relationships to Neo4j via HTTP transactional endpoint.
+
+### `POST /api/agentic/workflow/run`
+Runs proactive planner workflow across goals and candidate listings.
+
+---
+
+## 13) Additional Environment Variables (Optional)
+
+```env
+# Virtual staging
+STABILITY_API_KEY=
+
+# LLM-assisted scraping
+OPENAI_API_KEY=
+
+# Vector DB (Pinecone)
+VECTOR_DB_PROVIDER=pinecone
+PINECONE_API_KEY=
+PINECONE_INDEX_URL=
+
+# Graph DB (Neo4j)
+NEO4J_HTTP_URL=
+NEO4J_USERNAME=
+NEO4J_PASSWORD=
+
+# Strict confidence gate for search response insights
+AGENTIC_STRICT_MODE=true
+```
+
+If these are not set, modules degrade gracefully with safe fallbacks.

@@ -5,6 +5,8 @@ import { scrapePropertyImages, downloadImage } from "@/lib/imageScraper";
 import { scoreBestPropertyImage } from "@/lib/imageScoring";
 import { fetchSatelliteImage, fetchRoadmapImage } from "@/lib/satelliteImagery";
 import { analyzeSatelliteImagery } from "@/lib/satelliteAnalysis";
+import { runAgenticEvaluation } from "@/lib/agentic/orchestrator";
+import { estimateHash } from "@/lib/agentic/utils";
 
 export const maxDuration = 300; // Allow up to 5 minutes for this API route (processing all properties)
 
@@ -46,6 +48,26 @@ async function analyzeLocation(lat: number, lng: number) {
   }
 }
 
+function parseBedrooms(bedrooms?: string): number | undefined {
+  if (!bedrooms) return undefined;
+  const match = bedrooms.match(/(\d+)/);
+  if (!match) return undefined;
+  return parseInt(match[1], 10);
+}
+
+function parseBathrooms(bathrooms?: string): number | undefined {
+  if (!bathrooms) return undefined;
+  const match = bathrooms.match(/(\d+)/);
+  if (!match) return undefined;
+  return parseInt(match[1], 10);
+}
+
+function extractPhoneNumber(text?: string): string | undefined {
+  if (!text) return undefined;
+  const match = text.match(/(?:\+91[-\s]?)?[6-9]\d{9}/);
+  return match?.[0];
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
@@ -53,6 +75,9 @@ export async function GET(request: NextRequest) {
   const propertyType = searchParams.get("propertyType") || "apartment";
   const listingType = searchParams.get("listingType") || "rent";
   const bhk = searchParams.get("bhk") || "any";
+  const strictAgentic =
+    (searchParams.get("strictAgentic") ?? process.env.AGENTIC_STRICT_MODE ?? "true") !==
+    "false";
 
   if (!location) {
     return NextResponse.json(
@@ -116,6 +141,73 @@ export async function GET(request: NextRequest) {
     // Run all analyses in parallel (NO race condition - let all promises complete)
     // Individual timeouts per property ensure completion or graceful failure
     await Promise.all([...locationPromises, ...scoringPromises]);
+
+    // Run agentic evaluation per property (best effort with timeout)
+    const agenticPromises = properties.map(async (property, index) => {
+      try {
+        const peers = properties
+          .filter((_, peerIndex) => peerIndex !== index)
+          .slice(0, 6)
+          .map((peer) => ({
+            id: peer.id,
+            title: peer.title,
+            listedPrice: peer.price,
+            location: peer.location,
+            areaSqft: peer.area ? parseInt(peer.area.replace(/[^\d]/g, ""), 10) : undefined,
+            bedrooms: parseBedrooms(peer.bedrooms),
+            bathrooms: parseBathrooms(peer.bathrooms),
+            conditionScore: peer.conditionScore?.overall,
+            greeneryIndex: peer.locationIndices?.greeneryIndex,
+            trafficCongestionIndex: peer.locationIndices?.trafficCongestionIndex,
+          }));
+
+        const evaluationResult = await Promise.race([
+          runAgenticEvaluation(
+            {
+              goal: `Find a ${bhk !== "any" ? `${bhk} BHK ` : ""}${propertyType} in ${location} for ${listingType}`,
+              location,
+              propertyType,
+              bedrooms: parseBedrooms(property.bedrooms),
+              horizonMonths: 24,
+            },
+            {
+              id: property.id,
+              title: property.title,
+              listedPrice: property.price,
+              location: property.location,
+              areaSqft: property.area ? parseInt(property.area.replace(/[^\d]/g, ""), 10) : undefined,
+              bedrooms: parseBedrooms(property.bedrooms),
+              bathrooms: parseBathrooms(property.bathrooms),
+              conditionScore: property.conditionScore?.overall,
+              greeneryIndex: property.locationIndices?.greeneryIndex,
+              trafficCongestionIndex: property.locationIndices?.trafficCongestionIndex,
+              imageHash: property.imageUrl
+                ? estimateHash(property.imageUrl)
+                : estimateHash(property.link),
+              phone: extractPhoneNumber(property.description),
+            },
+            peers
+          ),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+        ]);
+
+        if (evaluationResult) {
+          const evaluation = evaluationResult.evaluation;
+          if (strictAgentic && !evaluation.accuracy.passesStrictChecks) {
+            properties[index].agenticEvaluation = undefined;
+            properties[index].agenticSuppressedReason =
+              `Suppressed by strict mode: ${evaluation.accuracy.failedChecks.join(", ")}`;
+          } else {
+            properties[index].agenticEvaluation = evaluation;
+            properties[index].agenticSuppressedReason = undefined;
+          }
+        }
+      } catch (error) {
+        console.error(`Error running agentic evaluation for property ${index}:`, error);
+      }
+    });
+
+    await Promise.all(agenticPromises);
 
     return NextResponse.json({
       results: properties,

@@ -1,3 +1,5 @@
+import type { AgenticEvaluation } from "@/lib/agentic/types";
+
 export interface PropertyScore {
   modernity: number; // 1-10
   wearAndTear: number; // 1-10 (10 = pristine, 1 = poor condition)
@@ -32,6 +34,8 @@ export interface Property {
   lng?: number;
   conditionScore?: PropertyScore; // CNN-based condition scoring
   locationIndices?: LocationIndices; // ViT-based satellite analysis
+  agenticEvaluation?: AgenticEvaluation;
+  agenticSuppressedReason?: string;
   // Indicates this is aggregated data from search results - actual prices may vary
   isAggregated?: boolean;
 }
