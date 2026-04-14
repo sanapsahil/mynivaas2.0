@@ -1,0 +1,319 @@
+================================================================================
+                    CODEBASE ANALYSIS: QUICK SUMMARY
+================================================================================
+
+QUESTION 1: How properties are currently fetched in /api/search endpoint
+────────────────────────────────────────────────────────────────────────────────
+
+Location: /src/app/api/search/route.ts
+
+Flow:
+  GET /api/search?location=Bangalore&propertyType=apartment&listingType=rent
+    ↓
+  1. searchProperties() - SerpAPI Google search (~30-50 results)
+  2. geocodeLocation() - Get coordinates
+  3. Parallel enrichment:
+     • Location Analysis: satellite imagery → greenery/traffic indices (3s timeout)
+     • Image Scoring: scrape images → score condition → store first URL (5s timeout)
+     • Agentic Evaluation: AI valuation against peers (2.5s timeout)
+    ↓
+  Returns: Property[] with all enrichment data
+
+Key: All 3 enrichment steps run in parallel with individual timeouts
+Problem: Images are scraped (3 per property) but only first one stored & no embeddings created
+
+
+================================================================================
+QUESTION 2: What property data structure looks like
+────────────────────────────────────────────────────────────────────────────────
+
+Location: /src/lib/serpapi.ts (Lines 15-41)
+
+Interface: Property {
+  id: string                              // Unique ID
+  title: string                           // Property title
+  price: number                           // Normalized numeric
+  priceFormatted: string                  // "₹45 Lac"
+  location: string                        // Main location + locality
+  address?: string
+  type: string                            // apartment/house/plot
+  bedrooms?: string                       // "2 BHK"
+  bathrooms?: string                      // "2 Bath"
+  area?: string                           // "1100 sq. ft"
+  furnishing?: string                     // furnished/unfurnished
+  source: string                          // 99acres/Housing.com/etc
+  sourceIcon?: string
+  link: string                            // Direct listing URL
+  description?: string                    // Snippet (max 200 chars)
+  imageUrl?: string                       // SINGLE image URL (FIRST SCRAPED)
+  postedDate?: string
+  lat?: number                            // Scattered map coordinates
+  lng?: number
+  
+  ENRICHMENT DATA:
+  conditionScore?: {
+    modernity: 1-10
+    wearAndTear: 1-10 (10=pristine)
+    lighting: 1-10
+    overall: 1-10 average
+  }
+  
+  locationIndices?: {
+    greeneryIndex: 0-100 (% green coverage)
+    trafficCongestionIndex: 0-100 (0=none, 100=heavy)
+  }
+  
+  agenticEvaluation?: AgenticEvaluation   // AI valuation
+  agenticSuppressedReason?: string
+  isAggregated?: boolean
+}
+
+Key Points:
+  • Price parsing: Handles Lac, Crore, K formats
+  • Image storage: Only first scraped image in imageUrl
+  • Coordinates: Randomly scattered around geocoded center (±0.01°)
+  • Condition score: CNN-based analysis of property photos
+  • Multiple formats: Flexible field extraction from various sources
+
+
+================================================================================
+QUESTION 3: Current vector store schema and embeddings storage
+────────────────────────────────────────────────────────────────────────────────
+
+Location: /src/lib/vectorStore.ts (Lines 1-31)
+
+Schema:
+  EmbeddingRecord {
+    id: string                            // Property ID or image hash
+    embedding: number[]                   // 512-dim CLIP-ViT vector (L2 normalized)
+    propertyData: {
+      title: string
+      price: string
+      link: string
+      imageUrl: string                    // ← IMAGE URL STORED HERE
+      bedrooms?: string
+      bathrooms?: string
+      area?: string
+      location?: string
+      source?: string
+      locationIndices?: {
+        greeneryPercentage: number
+        trafficCongestionPercentage: number
+      }
+      conditionScore?: number             // Overall 1-10
+    }
+    timestamp: number                     // When added
+  }
+  
+  VectorStoreIndex {
+    version: string                       // "1.0"
+    recordCount: number
+    lastUpdated: number
+    records: EmbeddingRecord[]
+  }
+
+Storage: /public/vector-store.json (JSON file)
+
+Key Functions:
+  loadVectorStore()                                    // Load from disk
+  saveVectorStore(store)                              // Save to disk
+  addToVectorStore(record, autoSave=true)            // Add/update single
+  batchAddToVectorStore(records[])                   // Bulk add/update
+  searchSimilarEmbeddings(queryEmb, topK, threshold) // Search
+  getVectorStoreStats()
+  clearVectorStore()
+
+Embedding Model:
+  • Model: Xenova/clip-vit-base-patch32
+  • Dimensions: 512
+  • Normalization: L2 (ready for cosine similarity)
+  • Speed: ~5-10s per image (cold), ~2-3s (warm cache), ~0.1s (cached)
+  • Output: Float32Array normalized vectors
+
+Similarity Search:
+  • Algorithm: Cosine similarity (0-1 range)
+  • Default threshold: 0.45 (~42% similarity required)
+  • Default top-K: 30 results
+  • Complexity: O(n) linear scan
+
+CRITICAL: Currently NO embeddings being generated during search! Vector store is empty!
+
+
+================================================================================
+QUESTION 4: How /api/search-similar works and what it expects
+────────────────────────────────────────────────────────────────────────────────
+
+Location: /src/app/api/search-similar/route.ts
+
+POST /api/search-similar
+
+Request:
+  FormData {
+    image: File                          // Image file (any size)
+    ?topK: number = 30                   // 1-100 results
+    ?threshold: number = 0.45            // 0-1 similarity threshold
+  }
+
+Validation:
+  • File type must be image/*
+  • File size max 10MB
+  • topK range: 1-100
+  • threshold range: 0-1
+
+Flow:
+  1. Extract FormData
+  2. Validate inputs
+  3. Convert file to Buffer
+  4. generateImageEmbedding(buffer) → 512-dim vector
+  5. searchSimilarEmbeddings(queryEmbedding, topK, threshold)
+     └─ Load vector store
+     └─ For each record: calculate cosine similarity
+     └─ Filter by threshold >= 0.45
+     └─ Sort descending by similarity
+     └─ Return top K
+  6. Return results with similarity scores
+
+Response:
+  {
+    success: true,
+    results: [{
+      id: string                         // Record ID
+      similarity: number                 // 0-1 (4 decimals)
+      property: {                        // propertyData from record
+        title, price, link, imageUrl, bedrooms, bathrooms, area, location, source, ...
+      }
+      similarityPercentage: number      // 0-100 for display
+    }],
+    stats: {
+      matchesFound: number
+      topSimilarity: number
+      avgSimilarity: number
+      embeddingDimensions: 512
+    }
+  }
+
+GET /api/search-similar (Stats Only):
+  Returns vector store statistics (recordCount, version, lastUpdated)
+
+Example:
+  curl -X POST http://localhost:3000/api/search-similar \
+    -F "image=@photo.jpg" \
+    -F "topK=30" \
+    -F "threshold=0.45"
+
+
+================================================================================
+QUESTION 5: How images are currently handled in property listings
+────────────────────────────────────────────────────────────────────────────────
+
+Location: /src/lib/imageScraper.ts
+
+Step 1: scrapePropertyImages(url, maxImages=5)
+  • Fetches HTML with 8s timeout
+  • Tries multiple CSS selectors (in priority):
+    1. img[class*="property"]
+    2. img[class*="gallery"]
+    3. img[alt*="apartment"]
+    4. div[class*="gallery"] img
+    5. [data-testid*="image"] img
+    6. Fallback: all images (filter logos/icons)
+  • Returns: array of full image URLs
+
+Step 2: downloadImage(imageUrl)
+  • Axios GET with 10s timeout
+  • Max size: 10MB
+  • Spoof User-Agent (avoid blocking)
+  • Returns: Buffer or null
+
+Step 3: In /api/search/route.ts (Lines 121-139)
+  For each property:
+    1. imageUrls = scrapePropertyImages(property.link, 3)  // 3 images
+    2. buffers = Promise.all(downloadImage for each)       // 5s timeout
+    3. score = scoreBestPropertyImage(buffers)             // CNN scoring
+    4. Store property.imageUrl = imageUrls[0]              // ONLY FIRST!
+    
+Problem: All 3 images scraped but only first stored
+Result: No embeddings created, vector store not populated
+
+Image Embedding: /src/lib/imageEmbeddings.ts
+  generateImageEmbedding(imageBuffer):
+    1. Check cache first (by buffer hash)
+    2. Resize to 224x224 (JPEG quality 80)
+    3. Load CLIP-ViT model (retry 3x if fail)
+    4. Extract raw RGB pixel data
+    5. Pipeline inference → 512-dim vector
+    6. L2 normalize
+    7. Cache result
+    8. Return normalized vector
+
+  Output: Float32Array(512) L2-normalized
+
+Cache: /.embedding-cache/
+  • Prevents re-embedding same image
+  • Improves performance dramatically
+
+
+================================================================================
+KEY FINDING: IMAGE URL EXTRACTION & LINKING
+────────────────────────────────────────────────────────────────────────────────
+
+✓ Image URLs ARE being extracted (via Cheerio)
+✓ Multiple images ARE being scraped (up to 3-5 per property)
+✓ Images ARE being downloaded and scored
+✓ Embedding generation IS working (CLIP-ViT model)
+✓ Vector store structure HAS imageUrl field
+✓ Search-similar endpoint IS ready
+
+❌ BUT: Only first image URL is STORED in Property.imageUrl
+❌ BUT: NO embeddings are being GENERATED during search
+❌ BUT: Vector store is NOT being POPULATED during search
+❌ BUT: Multiple images per property are NOT being LINKED
+
+SOLUTION:
+  1. Store ALL image URLs (not just first): Property.imageUrls[]
+  2. Generate embedding for EACH image during search
+  3. Create EmbeddingRecord for each image with proper linking
+  4. Batch upsert to vector store
+  5. Link back to property via ID
+
+
+================================================================================
+FILES TO REVIEW
+────────────────────────────────────────────────────────────────────────────────
+
+PROPERTY FETCHING & STRUCTURE:
+  • /src/app/api/search/route.ts (226 lines) - Main search endpoint
+  • /src/lib/serpapi.ts (428 lines) - Property interface & parsing
+
+IMAGE HANDLING:
+  • /src/lib/imageScraper.ts (135 lines) - Scrape & download images
+  • /src/lib/imageEmbeddings.ts (282 lines) - Generate embeddings
+
+VECTOR STORAGE:
+  • /src/lib/vectorStore.ts (262 lines) - Storage & search
+  • /public/vector-store.json - Actual storage file
+
+SIMILARITY SEARCH:
+  • /src/app/api/search-similar/route.ts (156 lines) - Similarity endpoint
+  • /src/lib/agentic/vectorDb.ts (90 lines) - Pinecone adapter (optional)
+
+EMBEDDING CACHE:
+  • /src/lib/embeddingCache.ts - Cache management
+  • /.embedding-cache/ - Cache directory
+
+
+================================================================================
+NEXT STEPS FOR INTEGRATION
+────────────────────────────────────────────────────────────────────────────────
+
+1. Update Property interface to include imageUrls[] and imageEmbeddingIds[]
+2. Modify search endpoint to generate embeddings for all images
+3. Batch upsert EmbeddingRecords to vector store
+4. Test similarity search with real images
+5. Monitor performance (embedding time, vector store size)
+6. Implement caching strategies for efficiency
+7. Add monitoring & debugging hooks
+
+See IMPLEMENTATION_GUIDE.md for detailed code examples.
+
+================================================================================
