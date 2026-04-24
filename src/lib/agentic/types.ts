@@ -49,6 +49,7 @@ export interface ValuationInput {
   nearbyInfraScore?: number;
   comparableMedianPrice?: number;
   comparableCount?: number;
+  visualFeature?: number; // EfficientNet visual feature (5-10% weight)
 }
 
 export interface FeatureContribution {

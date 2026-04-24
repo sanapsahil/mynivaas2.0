@@ -1,0 +1,707 @@
+MYNIVAAS / ESTATECOMPARE - COMPLETE PROJECT DOCUMENTATION
+Version: 1.0 (Generated from current repository state)
+Repository Root: /Users/sahil/Desktop/capstone
+Primary Stack: Next.js 16 + React 19 + TypeScript
+
+====================================================================
+1) PROJECT OVERVIEW
+====================================================================
+
+Project summary:
+This project is an AI-assisted real-estate intelligence and comparison platform.
+It aggregates listings from multiple real-estate websites, enriches listings with
+computer-vision and geospatial signals, and provides both classic and agentic
+decision support. It also supports visual search (search by room photo) using
+image embeddings and vector similarity.
+
+Core user capabilities:
+- Search listings by location, property type, listing type, and BHK.
+- Compare results with map markers and card-based ranking.
+- Analyze image-based property condition (modernity, wear/tear, lighting).
+- Analyze location quality (greenery index, traffic congestion index).
+- Run agentic evaluations (fair value, forecast, fraud risk, sentiment,
+  negotiation draft, confidence summary).
+- Search similar properties by uploading an image.
+- Index properties into a vector store for visual retrieval.
+
+====================================================================
+2) TECHNOLOGY STACK
+====================================================================
+
+Framework and language:
+- Next.js: 16.1.7
+- React: 19.2.3
+- React DOM: 19.2.3
+- TypeScript: ^5
+
+Styling and UI:
+- Tailwind CSS v4
+- PostCSS via @tailwindcss/postcss
+
+Maps:
+- leaflet
+- react-leaflet
+
+Data extraction and image processing:
+- cheerio (HTML parsing)
+- axios (image download + HTTP utility)
+- sharp (image processing)
+
+AI / embeddings:
+- @xenova/transformers (CLIP-based image embeddings)
+
+Search source:
+- serpapi
+
+Linting:
+- eslint
+- eslint-config-next
+
+Persistence:
+- Local JSON vector store: public/vector-store.json
+- Local embedding cache directory: .embedding-cache/
+
+Optional integrations:
+- OpenAI Responses API (agentic scraper extraction)
+- Pinecone (vector DB adapter)
+- Neo4j HTTP API (graph sync)
+- Stability AI API (virtual staging)
+
+====================================================================
+3) TOP-LEVEL REPOSITORY STRUCTURE
+====================================================================
+
+Important root files and folders:
+- package.json, package-lock.json
+- next.config.ts
+- tsconfig.json
+- eslint.config.mjs
+- postcss.config.mjs
+- README.md
+- START_HERE.md
+- FEATURE_COMPLETE.md
+- VISUAL_SEARCH_GUIDE.md
+- IMPLEMENTATION_GUIDE.md
+- VECTOR_STORE_ANALYSIS.md
+- ARCHITECTURE_DIAGRAM.md
+- RESEARCH_PAPER_IMPLEMENTATION_ANALYSIS.md
+- QUICK_SUMMARY.txt
+- ANALYSIS_SUMMARY.txt
+- public/
+- src/
+
+Runtime/generated/support folders present in workspace:
+- .next/
+- node_modules/
+- .embedding-cache/
+- venv/
+- .github/
+
+====================================================================
+4) SOURCE TREE (COMPLETE FILE MAP)
+====================================================================
+
+src/app/
+- src/app/favicon.ico
+- src/app/globals.css
+- src/app/layout.tsx
+- src/app/page.tsx
+- src/app/results/page.tsx
+- src/app/results/image-search/page.tsx
+
+src/app/api/
+- src/app/api/search/route.ts
+- src/app/api/search-similar/route.ts
+- src/app/api/embed-image/route.ts
+- src/app/api/index-properties/route.ts
+- src/app/api/score-property/route.ts
+- src/app/api/analyze-location/route.ts
+
+src/app/api/agentic/
+- src/app/api/agentic/plan/route.ts
+- src/app/api/agentic/evaluate/route.ts
+- src/app/api/agentic/scrape/route.ts
+- src/app/api/agentic/sentiment/route.ts
+- src/app/api/agentic/stage-room/route.ts
+- src/app/api/agentic/rag/query/route.ts
+- src/app/api/agentic/vector/query/route.ts
+- src/app/api/agentic/vector/upsert/route.ts
+- src/app/api/agentic/graph/sync/route.ts
+- src/app/api/agentic/workflow/run/route.ts
+
+src/components/
+- src/components/Header.tsx
+- src/components/Footer.tsx
+- src/components/SearchForm.tsx
+- src/components/PropertyCard.tsx
+- src/components/MapView.tsx
+- src/components/ImageUploadModal.tsx
+- src/components/LoadingCard.tsx
+
+src/lib/
+- src/lib/serpapi.ts
+- src/lib/geocode.ts
+- src/lib/imageScraper.ts
+- src/lib/imageScoring.ts
+- src/lib/satelliteImagery.ts
+- src/lib/satelliteAnalysis.ts
+- src/lib/imageEmbeddings.ts
+- src/lib/embeddingCache.ts
+- src/lib/vectorStore.ts
+
+src/lib/agentic/
+- src/lib/agentic/types.ts
+- src/lib/agentic/utils.ts
+- src/lib/agentic/planner.ts
+- src/lib/agentic/orchestrator.ts
+- src/lib/agentic/valuation.ts
+- src/lib/agentic/forecast.ts
+- src/lib/agentic/fraudGraph.ts
+- src/lib/agentic/negotiator.ts
+- src/lib/agentic/sentiment.ts
+- src/lib/agentic/scraper.ts
+- src/lib/agentic/rag.ts
+- src/lib/agentic/workflow.ts
+- src/lib/agentic/neo4j.ts
+- src/lib/agentic/vectorDb.ts
+- src/lib/agentic/virtualStaging.ts
+- src/lib/agentic/propertyAnalyzer.ts
+
+====================================================================
+5) APPLICATION ARCHITECTURE
+====================================================================
+
+Layer 1: Listing acquisition and normalization
+- Multi-query SerpAPI search for listing snippets across domains.
+- Price extraction and normalization (INR formats: Cr, Lac, K, raw numeric).
+- Deduplication by canonical URL.
+- Listing-type filtering (buy/rent/pg) and unrealistic price filtering.
+
+Layer 2: Enrichment
+- Geocoding and coordinate scattering for map display.
+- Image scraping/download and condition scoring.
+- Satellite + roadmap tile analysis for greenery/traffic metrics.
+
+Layer 3: Agentic analysis
+- Goal planner produces task DAG.
+- Property-level orchestrator computes valuation, forecast, fraud clusters,
+  defects, sentiment, negotiation draft, and confidence metadata.
+- Strict mode can suppress low-confidence agentic evaluations.
+
+Layer 4: Retrieval and vector infrastructure
+- Image embeddings generated via CLIP model.
+- Local vector store supports cosine similarity retrieval.
+- Optional Pinecone adapter for remote vector DB usage.
+- Multimodal RAG module supports text + image weighted retrieval.
+
+Layer 5: UI delivery
+- Homepage search + upload CTA.
+- Results page with map/list and rich property cards.
+- Image similarity results page with match statistics.
+
+====================================================================
+6) FRONTEND PAGES AND COMPONENTS
+====================================================================
+
+Pages:
+1. Home page (src/app/page.tsx)
+   - Search initiation and image-search entry point.
+2. Results page (src/app/results/page.tsx)
+   - Listing cards, map markers, ranking, and enriched insights.
+3. Image search results page (src/app/results/image-search/page.tsx)
+   - Similarity-ranked matches and stats.
+
+Shared components:
+- Header.tsx: top navigation and branding.
+- Footer.tsx: footer layout.
+- SearchForm.tsx: user filters and query inputs.
+- PropertyCard.tsx: listing detail card + AI insights display.
+- MapView.tsx: interactive map with marker states.
+- ImageUploadModal.tsx: drag-and-drop image upload UX.
+- LoadingCard.tsx: skeleton/loading state.
+
+====================================================================
+7) COMPLETE API DOCUMENTATION
+====================================================================
+
+A) Core APIs
+
+1) GET /api/search
+Purpose:
+- Main listing discovery and enrichment endpoint.
+
+Query params:
+- location (required)
+- propertyType (optional; default apartment)
+- listingType (optional; default rent; buy/rent/pg)
+- bhk (optional; default any)
+- strictAgentic (optional)
+
+Behavior:
+- Calls searchProperties + geocodeLocation in parallel.
+- Scatters marker coordinates.
+- For each property:
+  - analyzeLocation (3s timeout)
+  - scoreProperty/images (5s timeout)
+  - runAgenticEvaluation (2.5s timeout)
+- Returns best-effort enriched output.
+
+Response shape:
+- results: Property[]
+- total: number
+- query: object
+- center: object|null
+
+2) POST /api/search-similar
+Purpose:
+- Find visually similar properties from vector store.
+
+Input:
+- multipart/form-data with image
+- Query params: topK (1..100), threshold (0..1)
+
+Behavior:
+- Validates image type and <=10MB
+- Creates embedding
+- Runs cosine similarity search against stored vectors
+
+Output:
+- results with similarity and property metadata
+- stats object (matches, top/avg similarity, dimensions)
+
+3) GET /api/search-similar
+Purpose:
+- Returns vector store status and statistics.
+
+4) POST /api/embed-image
+Purpose:
+- Embed one uploaded image and return vector dimensions and metadata.
+
+Input:
+- multipart/form-data with image
+
+5) POST /api/index-properties
+Purpose:
+- Batch indexing pipeline for visual search corpus population.
+
+Input body:
+- location (required)
+- propertyType, listingType, bhk (optional)
+- limit (optional, capped to 100)
+
+Behavior:
+- Fetch listings, scrape images, generate embeddings, add to vector store.
+- Includes per-property failure collection.
+
+Output:
+- success/indexed/total/failureCount/message.
+
+6) GET /api/index-properties?action=status
+Purpose:
+- Vector store status for indexing workflow.
+
+7) GET /api/score-property
+Purpose:
+- Score listing images from property URL.
+
+Query params:
+- url (required)
+
+8) GET /api/analyze-location
+Purpose:
+- Compute greenery and traffic indices from lat/lng.
+
+Query params:
+- lat, lng (required)
+
+B) Agentic APIs
+
+9) POST /api/agentic/plan
+- Input: UserGoalInput with goal string
+- Output: normalized goal and task plan DAG
+
+10) POST /api/agentic/evaluate
+- Input: goal, property, optional peers
+- Output: planner + full agentic evaluation payload
+
+11) GET /api/agentic/scrape
+- Input: url query
+- Output: extracted fields via heuristic or llm-assisted mode
+
+12) GET /api/agentic/sentiment
+- Input: query text
+- Output: sentiment score, confidence, highlights, sources
+
+13) POST /api/agentic/stage-room
+- Input: imageUrl/prompt/style/roomType
+- Output: generated/simulated staging response
+
+14) POST /api/agentic/rag/query
+- Input: multipart (query, optional docs, optional image)
+- Output: multimodal retrieval results + indexed count
+
+15) POST /api/agentic/vector/upsert
+- Input: vector records array
+- Output: upsert success metadata
+
+16) POST /api/agentic/vector/query
+- Input: query vector, optional topK
+- Output: query result list
+
+17) POST /api/agentic/graph/sync
+- Input: nodes and edges arrays
+- Output: neo4j sync status
+
+18) POST /api/agentic/workflow/run
+- Input: goals[] + listings[]
+- Output: top recommendation per goal
+
+====================================================================
+8) CORE LIBRARY MODULES AND IMPLEMENTATION DETAILS
+====================================================================
+
+1. src/lib/serpapi.ts
+- Defines Property and SearchParams interfaces.
+- Builds multiple search queries to improve coverage and precision.
+- Filters aggregate pages and non-matching listing types.
+- Price normalization handles Cr/Lac/K and raw values.
+- Deduplicates by normalized URL.
+- Sorts results by ascending price.
+
+2. src/lib/geocode.ts
+- Geocodes location using OSM Nominatim.
+- Adds scatter offsets to avoid marker overlap in maps.
+
+3. src/lib/imageScraper.ts
+- Scrapes listing HTML for likely property images via selector sets.
+- Downloads images with request limits and safeguards.
+
+4. src/lib/imageScoring.ts
+- Computes image statistics from raw pixels.
+- Produces four scores:
+  - modernity
+  - wearAndTear
+  - lighting
+  - overall
+- Uses heuristic CV scoring with fallback neutral scores on error.
+
+5. src/lib/satelliteImagery.ts
+- Fetches ESRI satellite and OSM roadmap tiles at zoom 17.
+
+6. src/lib/satelliteAnalysis.ts
+- Greenery estimation by vegetation pixel logic.
+- Traffic estimation from road/highway/connectivity heuristics.
+- Returns normalized 0..100 indices.
+
+7. src/lib/imageEmbeddings.ts
+- Loads CLIP model from transformers runtime.
+- Preprocesses image to 224x224.
+- Generates embedding vectors and normalizes for cosine search.
+- Uses caching utilities to reduce repeated inference.
+
+8. src/lib/embeddingCache.ts
+- Stores embeddings by hash in .embedding-cache.
+- TTL-based staleness handling (30 days).
+
+9. src/lib/vectorStore.ts
+- File-based store operations:
+  - load/save
+  - add/batch add
+  - cosine search
+  - stats/clear
+- Backing file: public/vector-store.json.
+
+====================================================================
+9) AGENTIC SUBSYSTEM - COMPLETE BREAKDOWN
+====================================================================
+
+1. types.ts
+- Defines all agent interfaces and data contracts:
+  - tasks, planner output
+  - valuation input/output
+  - forecast input/output
+  - fraud nodes/clusters
+  - negotiation payloads
+  - sentiment payload
+  - final AgenticEvaluation schema
+
+2. planner.ts
+- Converts user goal into 8-task plan:
+  search -> vision -> sentiment -> valuation -> risk -> forecast -> negotiate -> report
+- Encodes task dependencies.
+
+3. orchestrator.ts
+- End-to-end per-property evaluation pipeline:
+  - sentiment fetch/scoring
+  - comparable extraction
+  - fair value estimation
+  - forecast projection
+  - fraud cluster detection
+  - defect derivation
+  - negotiation draft
+  - recommendation and confidence signals
+- Computes strict-check failures for confidence gating.
+
+4. valuation.ts
+- Rule/feature-contribution fair-value surrogate model.
+- Uses location, condition, greenery, traffic, sentiment, infra, area.
+- Optionally blends comparable median when enough peers exist.
+
+5. forecast.ts
+- Surrogate forecasting over 1..24 months.
+- Monthly drift includes base growth + repo + infra + sentiment terms.
+- Adds seasonality and outputs projected return percent.
+
+6. fraudGraph.ts
+- Builds graph edges based on fraud evidence:
+  - shared phone
+  - shared image hash
+  - high text similarity
+  - significant same-locality price variance
+- Creates connected components and risk scores.
+
+7. sentiment.ts
+- Pulls Reddit snippets and scores lexical polarity.
+- Returns score, confidence, highlights, and source list.
+
+8. negotiator.ts
+- Calculates discount from overpricing + defect penalties.
+- Generates email subject/body and counter-offer price.
+
+9. scraper.ts
+- Fetches arbitrary page and extracts structured fields.
+- Modes:
+  - behavioral-fetch + heuristic parsing
+  - llm-assisted extraction (if OPENAI_API_KEY set)
+
+10. rag.ts
+- In-memory document indexing.
+- Multimodal retrieval score:
+  score = lexical * 0.55 + visual * 0.45
+- Supports optional image-conditioned retrieval.
+
+11. workflow.ts
+- Proactive multi-goal evaluation over listing sets.
+- Picks top listing per goal via composite score using fair value delta,
+  forecast return, and fraud risk.
+
+12. neo4j.ts
+- Optional graph sync to Neo4j HTTP endpoint.
+- Upserts nodes and edges via Cypher statements.
+
+13. vectorDb.ts
+- Adapter interface for vector providers.
+- Pinecone implementation + default no-op fallback.
+
+14. virtualStaging.ts
+- Optional Stability API room staging.
+- Graceful fallback to simulated output when key missing.
+
+15. propertyAnalyzer.ts
+- Extracts semantic features from property descriptions for indexing context.
+
+====================================================================
+10) DATA MODELS (HIGH-LEVEL)
+====================================================================
+
+Primary listing model (Property in serpapi.ts):
+- Identity: id, title, link, source
+- Pricing: price (numeric), priceFormatted
+- Attributes: bedrooms, bathrooms, area, furnishing, type
+- Spatial: location, address, lat, lng
+- Media: imageUrl (optional)
+- AI enrichments:
+  - conditionScore
+  - locationIndices
+  - agenticEvaluation
+  - agenticSuppressedReason
+
+Agentic evaluation model (types.ts):
+- fairValue
+- forecast
+- fraudRisk
+- defects
+- sentiment
+- negotiation
+- recommendation
+- accuracy metadata
+
+Vector record (vectorStore.ts):
+- id
+- embedding: number[]
+- propertyData: listing metadata snapshot
+- timestamp
+
+RAG document model (rag.ts):
+- id, text, source, optional embedding
+
+====================================================================
+11) CONFIGURATION AND ENVIRONMENT VARIABLES
+====================================================================
+
+Required for core search:
+- SERPAPI_KEY
+
+Optional for enhanced/advanced features:
+- OPENAI_API_KEY (agentic scrape llm-assisted extraction)
+- STABILITY_API_KEY (virtual staging generation)
+- VECTOR_DB_PROVIDER (set to pinecone to use Pinecone adapter)
+- PINECONE_API_KEY
+- PINECONE_INDEX_URL
+- NEO4J_HTTP_URL
+- NEO4J_USERNAME
+- NEO4J_PASSWORD
+- AGENTIC_STRICT_MODE (defaults to true behavior)
+
+Example minimal .env:
+SERPAPI_KEY=your_key
+
+====================================================================
+12) BUILD, RUN, LINT, DEPLOY
+====================================================================
+
+Scripts (package.json):
+- npm run dev     -> next dev
+- npm run build   -> next build
+- npm run start   -> next start
+- npm run lint    -> eslint
+
+Typical local flow:
+1) npm install
+2) set .env (at least SERPAPI_KEY)
+3) npm run dev
+4) open http://localhost:3000
+
+Production flow:
+1) npm run build
+2) npm run start
+
+====================================================================
+13) NEXT.JS / TYPESCRIPT / LINT CONFIG SNAPSHOT
+====================================================================
+
+next.config.ts:
+- Configures Next Image remotePatterns for common property domains.
+- Also includes broad https wildcard remote host entry.
+
+tsconfig.json highlights:
+- strict: true
+- noEmit: true
+- moduleResolution: bundler
+- path alias: @/* -> ./src/*
+
+eslint.config.mjs highlights:
+- Uses next/core-web-vitals and next/typescript configs.
+- Global ignores include .next, out, build, next-env.d.ts
+
+====================================================================
+14) RUNTIME SAFEGUARDS, TIMEOUTS, AND FALLBACKS
+====================================================================
+
+Timeouts:
+- /api/search route maxDuration: 300s
+- /api/embed-image maxDuration: 120s
+- /api/search-similar maxDuration: 120s
+- /api/index-properties maxDuration: 600s
+- /api/agentic/rag/query maxDuration: 120s
+
+Per-task defensive timeouts in /api/search:
+- location analysis timeout per property: ~3s
+- image scoring timeout per property: ~5s
+- agentic evaluation timeout per property: ~2.5s
+
+Fallback behavior examples:
+- If image scoring fails -> neutral/default scores or null score
+- If satellite analysis fails -> neutral location indices
+- If optional providers not configured (Neo4j/Pinecone/Stability/OpenAI)
+  -> modules degrade gracefully or return simulated/empty responses
+- strictAgentic mode can hide low-confidence evaluations
+
+====================================================================
+15) FEATURE INVENTORY (COMPLETE)
+====================================================================
+
+Search and aggregation:
+- Multi-domain listing retrieval via SerpAPI query strategy
+- Deduplication, parsing, normalization, filtering
+
+Image intelligence:
+- Listing page image scraping and download
+- CV heuristic quality scoring (modernity, wear, lighting, overall)
+- CLIP embeddings for visual similarity
+
+Geospatial intelligence:
+- Geocoding and map marker scattering
+- Satellite + roadmap tile analysis
+- Greenery and traffic metrics
+
+Vector and retrieval:
+- Local JSON vector store with cosine similarity search
+- Optional Pinecone adapter
+- Image search endpoint and indexing pipeline
+
+Agentic intelligence:
+- Goal planner (task DAG)
+- Fair value estimator with feature contributions
+- Forecasting engine (surrogate)
+- Fraud cluster analysis (graph logic)
+- Sentiment analyzer (Reddit lexical)
+- Negotiation generator (counter-offer + email)
+- Multimodal RAG (lexical + visual weighted retrieval)
+- Proactive workflow runner (goal-wise top picks)
+- Optional Neo4j graph sync
+- Optional virtual room staging
+
+UX and frontend:
+- Search form, results cards, map integration, image upload modal,
+  loading states, header/footer
+
+====================================================================
+16) KNOWN LIMITATIONS / CURRENT REALITIES
+====================================================================
+
+- Several advanced modules are implemented as heuristic/surrogate models rather
+  than fully trained production ML pipelines.
+- Some optional integrations require external API keys and are inactive without
+  environment configuration.
+- Visual search quality depends on indexed corpus size and image quality.
+- Listing extraction depends on third-party site structure and may degrade if
+  HTML patterns change.
+- Agentic outputs use confidence gating; low-confidence results can be suppressed
+  in strict mode.
+
+====================================================================
+17) RELATED PROJECT DOCUMENTS (IN REPO)
+====================================================================
+
+For extended deep-dive reading:
+- README.md
+- START_HERE.md
+- FEATURE_COMPLETE.md
+- VISUAL_SEARCH_GUIDE.md
+- VECTOR_STORE_ANALYSIS.md
+- ARCHITECTURE_DIAGRAM.md
+- IMPLEMENTATION_GUIDE.md
+- RESEARCH_PAPER_IMPLEMENTATION_ANALYSIS.md
+- QUICK_SUMMARY.txt
+- ANALYSIS_SUMMARY.txt
+
+These docs complement this file with architecture sketches, implementation notes,
+and research-paper alignment discussion.
+
+====================================================================
+18) QUICK AUDIT CHECKLIST
+====================================================================
+
+To validate end-to-end system readiness quickly:
+[ ] SERPAPI_KEY configured
+[ ] npm install completed
+[ ] npm run dev launches successfully
+[ ] /api/search returns enriched listings
+[ ] /api/index-properties successfully indexes vectors
+[ ] /api/search-similar returns non-empty matches (after indexing)
+[ ] optional integrations tested (OpenAI/Pinecone/Neo4j/Stability if used)
+
+====================================================================
+END OF COMPLETE DOCUMENTATION
+====================================================================

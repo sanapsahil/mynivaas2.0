@@ -1,5 +1,4 @@
 import type { AgenticEvaluation } from "@/lib/agentic/types";
-import { parseIndianPrice, formatIndianPrice, isRealisticPrice as validateRealisticPrice, validatePrice as logPriceValidation } from "@/lib/priceParser";
 
 export interface PropertyScore {
   modernity: number; // 1-10
@@ -46,6 +45,44 @@ export interface SearchParams {
   propertyType: string;
   listingType: string;
   bhk?: string;
+}
+
+// ─── Price helpers ───
+
+function normalizePrice(priceStr: string): number {
+  if (!priceStr) return Infinity;
+  let cleaned = priceStr.replace(/[₹$]/g, "").replace(/Rs\.?/i, "").replace(/INR/i, "").trim();
+
+  const crMatch = cleaned.match(/([\d,.]+)\s*(?:Cr|Crore)/i);
+  if (crMatch) return parseFloat(crMatch[1].replace(/,/g, "")) * 10000000;
+
+  const lacMatch = cleaned.match(/([\d,.]+)\s*(?:Lac|Lakh|L)(?!\w)/i);
+  if (lacMatch) return parseFloat(lacMatch[1].replace(/,/g, "")) * 100000;
+
+  const kMatch = cleaned.match(/([\d,.]+)\s*K(?!\w)/i);
+  if (kMatch) return parseFloat(kMatch[1].replace(/,/g, "")) * 1000;
+
+  cleaned = cleaned.replace(/[^0-9.]/g, "");
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? Infinity : num;
+}
+
+function formatPrice(value: number): string {
+  if (value >= 10000000) {
+    const cr = value / 10000000;
+    return `₹${cr % 1 === 0 ? cr.toFixed(0) : cr.toFixed(2)} Cr`;
+  }
+  if (value >= 100000) {
+    const lac = value / 100000;
+    return `₹${lac % 1 === 0 ? lac.toFixed(0) : lac.toFixed(2)} Lac`;
+  }
+  return `₹${value.toLocaleString("en-IN")}`;
+}
+
+function isRealisticPrice(value: number, listingType: string): boolean {
+  if (value <= 0 || value === Infinity) return false;
+  if (listingType === "rent" || listingType === "pg") return value >= 2000 && value <= 5000000;
+  return value >= 100000 && value <= 5000000000;
 }
 
 // ─── Source helpers ───
@@ -201,38 +238,6 @@ function isAggregateResult(title: string, snippet: string): boolean {
   return aggregatePatterns.some(p => p.test(combined));
 }
 
-function hasPriceRange(text: string): boolean {
-  const lower = text.toLowerCase();
-  return (
-    /(?:₹|rs\.?)?\s*[\d,.]+(?:\s*(?:lac|lakh|cr|crore|k))?\s*(?:-|to)\s*(?:₹|rs\.?)?\s*[\d,.]+(?:\s*(?:lac|lakh|cr|crore|k))?/i.test(text) ||
-    /\bbetween\s+(?:₹|rs\.?)?\s*[\d,.]+(?:\s*(?:lac|lakh|cr|crore|k))?\s+and\s+(?:₹|rs\.?)?\s*[\d,.]+/i.test(text) ||
-    /\b(starting\s+from|price\s+from|onwards|onward)\b/i.test(lower)
-  );
-}
-
-function isOrdinaryUserListing(text: string, link: string): boolean {
-  const lower = `${text} ${link}`.toLowerCase();
-
-  const brokerOrBuilderSignals =
-    /\b(broker|developer|builder|project|new launch|under construction|rera|pre-launch|advertisement|ad)\b/i.test(lower);
-  if (brokerOrBuilderSignals) return false;
-
-  const ownerSignals = /\b(owner|direct owner|self owned|nobroker|no broker)\b/i.test(lower);
-  const noBrokerDomain = /nobroker\.(in|com)/i.test(link);
-
-  return ownerSignals || noBrokerDomain;
-}
-
-function isMumbaiContext(location: string, text: string): boolean {
-  const lower = `${location} ${text}`.toLowerCase();
-  return /\b(mumbai|bombay|andheri|borivali|goregaon|malad|powai|bandra|juhu|thane|navi mumbai)\b/i.test(lower);
-}
-
-function isBelowMumbaiBuyFloor(price: number, location: string, text: string): boolean {
-  const MUMBAI_BUY_MIN = 2_000_000; // ₹20L
-  return isMumbaiContext(location, text) && price < MUMBAI_BUY_MIN;
-}
-
 // ─── Check if result matches the requested listing type ───
 
 function matchesListingType(text: string, listingType: string): boolean {
@@ -292,16 +297,6 @@ function parseResultToProperties(
     return [];
   }
 
-  // Keep only ordinary user listings (not broker/developer/project pages)
-  if (!isOrdinaryUserListing(combined, link)) {
-    return [];
-  }
-
-  // Reject listings that only advertise a price range or "starting from"
-  if (hasPriceRange(combined)) {
-    return [];
-  }
-
   // Skip if not from a real estate site
   const isRealEstateSite = SITES.some(s => link.includes(s.replace("www.", "")));
   if (!isRealEstateSite) {
@@ -311,72 +306,34 @@ function parseResultToProperties(
     }
   }
 
-  // Extract all prices from the combined text, separated by type (rent vs sale)
+  // Extract all prices from the combined text
   const priceRegex = /(?:₹|Rs\.?)\s*([\d,]+(?:\.\d+)?)\s*(?:Lac|Lakh|L|Cr|Crore|K)?(?:\s*(?:\/\s*month|per\s*month|p\.m\.?|PM))?/gi;
-  const salePrices: { value: number; raw: string; index: number }[] = [];
-  const rentPrices: { value: number; raw: string; index: number }[] = [];
+  const prices: { value: number; raw: string; index: number }[] = [];
   let match;
 
   while ((match = priceRegex.exec(combined)) !== null) {
-    const rawPrice = match[0];
-    const value = parseIndianPrice(rawPrice);
-    
+    const value = normalizePrice(match[0]);
     // Skip if it looks like a count (810+ apartments)
     const afterIdx = match.index + match[0].length;
     if (afterIdx < combined.length && combined[afterIdx] === "+") continue;
-    
     // Skip deposit mentions
     const before = combined.slice(Math.max(0, match.index - 15), match.index);
     if (/deposit|security|maintenance/i.test(before)) continue;
 
-    // Check if this is a rent price (contains /month, per month, p.m., PM)
-    const isRentPrice = /\/\s*month|per\s*month|p\.?m\.?(?:\s|$)|per\s+month/i.test(rawPrice);
-    
-    if (isRentPrice && validateRealisticPrice(value, "rent")) {
-      rentPrices.push({ value, raw: rawPrice, index: match.index });
-    } else if (!isRentPrice && validateRealisticPrice(value, "buy")) {
-      salePrices.push({ value, raw: rawPrice, index: match.index });
+    if (isRealisticPrice(value, params.listingType)) {
+      prices.push({ value, raw: match[0], index: match.index });
     }
   }
 
-  // Select price based on listing type - prioritize matching price type
-  let selectedPrice: { value: number; raw: string; index: number } | undefined;
-  
-  if (params.listingType === "buy") {
-    // For buy: only accept explicit sale prices
-    selectedPrice = salePrices.length > 0 ? salePrices[0] : undefined;
-  } else if (params.listingType === "rent") {
-    // For rent: only accept explicit rent prices
-    selectedPrice = rentPrices.length > 0 ? rentPrices[0] : undefined;
-  } else if (params.listingType === "pg") {
-    // For PG: only accept explicit rent prices
-    selectedPrice = rentPrices.length > 0 ? rentPrices[0] : undefined;
-  }
+  if (prices.length === 0) return [];
 
-  if (!selectedPrice) return [];
-
-  // Use the selected price
-  const price = selectedPrice.value;
-
-  // Additional integrity guard: Mumbai buy listings below ₹20L are rejected
-  if (params.listingType === "buy" && isBelowMumbaiBuyFloor(price, params.location, combined)) {
-    return [];
-  }
+  // Use only the first (typically primary) price for this listing
+  const price = prices[0].value;
 
   // Create unique key - use link URL as primary dedup key
   const urlKey = link.replace(/[?#].*$/, "").toLowerCase();
   if (seenKeys.has(urlKey)) return [];
   seenKeys.add(urlKey);
-
-  // Debug logging
-  console.log("[PRICE DEBUG]", {
-    title: title.substring(0, 50),
-    listingType: params.listingType,
-    salePrices: salePrices.map(p => p.raw),
-    rentPrices: rentPrices.map(p => p.raw),
-    selected: selectedPrice.raw,
-    selectedValue: price,
-  });
 
   // USE ACTUAL TITLE FROM SEARCH RESULT - just clean up the source suffix
   // This ensures the title matches what the user will see when they click
@@ -408,7 +365,7 @@ function parseResultToProperties(
     id: `prop-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     title: propertyTitle,
     price,
-    priceFormatted: formatIndianPrice(price),
+    priceFormatted: formatPrice(price),
     location: locality,
     address: snippet.length > 20 ? snippet.match(/(?:at|in|near)\s+([^,\n.]+)/i)?.[1] : undefined,
     type: params.propertyType,

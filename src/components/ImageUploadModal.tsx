@@ -9,12 +9,19 @@ interface ImageUploadModalProps {
   onClose: () => void;
 }
 
+const listingTypes = [
+  { value: "buy", label: "Buy", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
+  { value: "rent", label: "Rent", icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" },
+  { value: "pg", label: "PG", icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" },
+];
+
 export default function ImageUploadModal({ isOpen, onClose }: ImageUploadModalProps) {
   const [dragActive, setDragActive] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [listingType, setListingType] = useState("rent");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -82,9 +89,9 @@ export default function ImageUploadModal({ isOpen, onClose }: ImageUploadModalPr
       const formData = new FormData();
       formData.append("image", selectedImage);
 
-      console.log("Searching for similar properties...");
+      console.log(`Searching for similar ${listingType} properties...`);
 
-      const response = await fetch("/api/search-similar?topK=30&threshold=0.45", {
+      const response = await fetch(`/api/search-similar?topK=30&threshold=0.45&listingType=${listingType}`, {
         method: "POST",
         body: formData,
       });
@@ -106,6 +113,7 @@ export default function ImageUploadModal({ isOpen, onClose }: ImageUploadModalPr
         JSON.stringify({
           results: data.results,
           stats: data.stats,
+          listingType: listingType,
           timestamp: Date.now(),
         })
       );
@@ -126,6 +134,7 @@ export default function ImageUploadModal({ isOpen, onClose }: ImageUploadModalPr
     setPreview(null);
     setError(null);
     setDragActive(false);
+    setListingType("rent");
     onClose();
   };
 
@@ -159,6 +168,32 @@ export default function ImageUploadModal({ isOpen, onClose }: ImageUploadModalPr
 
           {/* Content */}
           <div className="p-8">
+            {/* Listing Type Tabs */}
+            <div className="flex justify-center gap-4 flex-wrap mb-6">
+              {listingTypes.map((lt) => (
+                <button
+                  key={lt.value}
+                  type="button"
+                  onClick={() => setListingType(lt.value)}
+                  className={`flex items-center gap-2 rounded-2xl text-base font-bold transition-all cursor-pointer ${
+                    listingType === lt.value
+                      ? "bg-gradient-to-r from-blue-600 to-teal-600 text-white shadow-2xl shadow-blue-600/30"
+                      : "bg-white text-gray-700 hover:bg-blue-50 border-2 border-gray-100 hover:border-blue-300"
+                  }`}
+                  style={{
+                    padding: "12px 28px",
+                    transform: listingType === lt.value ? "translateY(-2px)" : "none",
+                    boxShadow: listingType === lt.value ? "0 8px 20px rgba(37,99,235,0.25)" : "0 2px 8px rgba(0,0,0,0.04)",
+                  }}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={lt.icon} />
+                  </svg>
+                  {lt.label}
+                </button>
+              ))}
+            </div>
+
             {/* Upload Area */}
             <div
               onDragEnter={handleDrag}

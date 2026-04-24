@@ -69,6 +69,20 @@ export function estimateFairPrice(input: ValuationInput): ValuationOutput {
     rationale: "Size-normalization against baseline area profile.",
   });
 
+  // Add EfficientNet visual feature (small weight: 5-10%)
+  const visualFeatureBoost =
+    input.visualFeature ? input.visualFeature / 2000 : 0; // Normalized to ~5-10% effect
+  if (input.visualFeature !== undefined) {
+    multiplier += visualFeatureBoost;
+    console.log("EfficientNet embedding added to valuation");
+    contributions.push({
+      feature: "visualFeature",
+      contribution: listedPrice * visualFeatureBoost,
+      rationale:
+        "EfficientNet visual features provide subtle correction based on image quality and condition.",
+    });
+  }
+
   const baseFairPrice = listedPrice * multiplier;
 
   const comparableBlendWeight =
@@ -88,6 +102,7 @@ export function estimateFairPrice(input: ValuationInput): ValuationOutput {
     input.greeneryIndex ? 1 : 0,
     input.trafficCongestionIndex ? 1 : 0,
     (input.comparableCount ?? 0) >= 3 ? 1 : 0,
+    input.visualFeature ? 1 : 0, // Additional confidence signal from visual feature
   ].reduce((sum, value) => sum + value, 0);
 
   const confidence = clamp(0.45 + confidenceSignals * 0.1, 0.45, 0.95);

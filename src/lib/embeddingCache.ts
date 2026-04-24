@@ -31,8 +31,9 @@ async function ensureCacheDir() {
 /**
  * Get cache file path for a given hash
  */
-function getCachePath(hash: string): string {
-  return path.join(CACHE_DIR, `${hash}.json`);
+function getCachePath(hash: string, prefix: string = ""): string {
+  const filename = prefix ? `${prefix}_${hash}` : hash;
+  return path.join(CACHE_DIR, `${filename}.json`);
 }
 
 /**
@@ -41,11 +42,21 @@ function getCachePath(hash: string): string {
 export async function getCachedEmbedding(
   buffer: Buffer
 ): Promise<number[] | null> {
+  return getCachedEmbeddingWithPrefix(buffer, "clip");
+}
+
+/**
+ * Get cached embedding with prefix (for different embedding types)
+ */
+async function getCachedEmbeddingWithPrefix(
+  buffer: Buffer,
+  prefix: string
+): Promise<number[] | null> {
   try {
     await ensureCacheDir();
 
     const hash = hashBuffer(buffer);
-    const cachePath = getCachePath(hash);
+    const cachePath = getCachePath(hash, prefix);
 
     try {
       const data = await fs.readFile(cachePath, "utf-8");
@@ -56,7 +67,9 @@ export async function getCachedEmbedding(
       const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
 
       if (ageMs < thirtyDaysMs) {
-        console.log(`✓ Cache hit for embedding (age: ${Math.round(ageMs / 1000)}s)`);
+        console.log(
+          `✓ Cache hit for ${prefix} embedding (age: ${Math.round(ageMs / 1000)}s)`
+        );
         return entry.embedding;
       } else {
         console.log("Cache expired, regenerating...");
@@ -73,17 +86,46 @@ export async function getCachedEmbedding(
 }
 
 /**
+ * Get cached CLIP embedding
+ */
+export async function getCachedClipEmbedding(
+  buffer: Buffer
+): Promise<number[] | null> {
+  return getCachedEmbeddingWithPrefix(buffer, "clip");
+}
+
+/**
+ * Get cached EfficientNet embedding
+ */
+export async function getCachedEfficientNetEmbedding(
+  buffer: Buffer
+): Promise<number[] | null> {
+  return getCachedEmbeddingWithPrefix(buffer, "efficientnet");
+}
+
+/**
  * Store embedding in cache
  */
 export async function cacheEmbedding(
   buffer: Buffer,
   embedding: number[]
 ): Promise<void> {
+  return cacheEmbeddingWithPrefix(buffer, embedding, "clip");
+}
+
+/**
+ * Store embedding in cache with prefix (for different embedding types)
+ */
+async function cacheEmbeddingWithPrefix(
+  buffer: Buffer,
+  embedding: number[],
+  prefix: string
+): Promise<void> {
   try {
     await ensureCacheDir();
 
     const hash = hashBuffer(buffer);
-    const cachePath = getCachePath(hash);
+    const cachePath = getCachePath(hash, prefix);
 
     const entry: CacheEntry = {
       hash,
@@ -92,11 +134,33 @@ export async function cacheEmbedding(
     };
 
     await fs.writeFile(cachePath, JSON.stringify(entry));
-    console.log(`✓ Cached embedding for hash ${hash.substring(0, 8)}...`);
+    console.log(
+      `✓ Cached ${prefix} embedding for hash ${hash.substring(0, 8)}...`
+    );
   } catch (error) {
     console.warn("Failed to cache embedding:", error);
     // Not critical - continue without caching
   }
+}
+
+/**
+ * Cache CLIP embedding
+ */
+export async function cacheClipEmbedding(
+  buffer: Buffer,
+  embedding: number[]
+): Promise<void> {
+  return cacheEmbeddingWithPrefix(buffer, embedding, "clip");
+}
+
+/**
+ * Cache EfficientNet embedding
+ */
+export async function cacheEfficientNetEmbedding(
+  buffer: Buffer,
+  embedding: number[]
+): Promise<void> {
+  return cacheEmbeddingWithPrefix(buffer, embedding, "efficientnet");
 }
 
 /**

@@ -89,22 +89,33 @@ function extractAreaNumeric(areaStr?: string): number {
   return match ? parseFloat(match[1]) : 500;
 }
 
-function calculatePricePerSqFt(price?: string, area?: string): number {
-  if (!price || !area) return 0;
+function calculatePricePerSqFt(price: number | string | undefined, area?: string): number {
+  if (!area) return 0;
 
-  const priceNumMatch = price.match(/(\d+(?:\.\d+)?)/);
+  // Handle price input - could be number or string (for backward compatibility)
+  let finalPrice: number;
+  
+  if (typeof price === 'number') {
+    finalPrice = price;
+  } else if (typeof price === 'string') {
+    // Parse string price for backward compatibility
+    const priceNumMatch = price.match(/(\d+(?:\.\d+)?)/);
+    if (!priceNumMatch) return 0;
+    
+    const priceNum = parseFloat(priceNumMatch[1]);
+    
+    // Handle price multipliers (Lac, Cr, K)
+    finalPrice = priceNum;
+    if (price.includes("Cr")) finalPrice *= 10000000;
+    else if (price.includes("Lac")) finalPrice *= 100000;
+    else if (price.includes("K")) finalPrice *= 1000;
+  } else {
+    return 0;
+  }
+
   const areaNumMatch = area.match(/(\d+(?:\.\d+)?)/);
-
-  if (!priceNumMatch || !areaNumMatch) return 0;
-
-  const priceNum = parseFloat(priceNumMatch[1]);
+  if (!areaNumMatch) return 0;
+  
   const areaNum = parseFloat(areaNumMatch[1]);
-
-  // Handle price multipliers (Lac, Cr, K)
-  let finalPrice = priceNum;
-  if (price.includes("Cr")) finalPrice *= 10000000;
-  if (price.includes("Lac")) finalPrice *= 100000;
-  if (price.includes("K")) finalPrice *= 1000;
-
   return areaNum > 0 ? finalPrice / areaNum : 0;
 }

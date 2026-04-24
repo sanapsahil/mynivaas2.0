@@ -122,7 +122,7 @@ export async function runAgenticEvaluation(
   };
 
   const fairValue = estimateFairPrice(valuationInput);
-  const forecast = forecastPropertyValue({
+  const forecast = await forecastPropertyValue({
     currentPrice: fairValue.fairPrice,
     horizonMonths: goalInput.horizonMonths ?? 24,
     sentimentDrift: sentiment.score,

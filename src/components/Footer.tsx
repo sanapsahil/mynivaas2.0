@@ -29,7 +29,7 @@ export default function Footer() {
           </p>
 
           <p className="text-xs text-text-muted">
-            &copy; {new Date().getFullYear()} EstateCompare
+            &copy; {new Date().getFullYear()} MyNivaas
           </p>
         </div>
       </div>

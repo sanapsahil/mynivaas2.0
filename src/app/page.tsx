@@ -15,11 +15,12 @@ export default function Home() {
       <main className="flex-1">
         {/* Hero Section */}
         <section
-          className="relative overflow-hidden"
+          className="relative overflow-hidden flex justify-center"
           style={{
             paddingTop: "100px",
             paddingBottom: "120px",
             background: "linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(15,118,110,0.02) 50%, rgba(245,158,11,0.02) 100%)",
+            width: "100%",
           }}
         >
           {/* Background Decoration */}
@@ -46,7 +47,7 @@ export default function Home() {
             }}
           />
 
-          <div className="relative max-w-5xl mx-auto px-6 lg:px-8">
+          <div className="relative w-full max-w-5xl px-6 lg:px-8" style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
             <div className="text-center w-full" style={{ marginBottom: "64px" }}>
               <div
                 className="inline-flex items-center justify-center gap-2 text-primary text-sm font-semibold rounded-full animate-fade-in-up"
@@ -139,8 +140,8 @@ export default function Home() {
         </section>
 
         {/* How It Works */}
-        <section id="how-it-works" className="bg-gradient-to-b from-white to-blue-50/50" style={{ padding: "100px 0" }}>
-          <div className="max-w-6xl mx-auto px-6 lg:px-8">
+        <section id="how-it-works" className="bg-gradient-to-b from-white to-blue-50/50 flex justify-center" style={{ padding: "100px 0", width: "100%" }}>
+          <div className="w-full max-w-6xl px-6 lg:px-8">
             <div className="text-center mb-20">
               <div
                 className="inline-flex items-center justify-center gap-2 text-primary text-xs font-bold rounded-full mb-6"
@@ -164,7 +165,7 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-8">
+            <div className="grid md:grid-cols-3 gap-8 w-full max-w-5xl" style={{ justifyItems: "center" }}>
               {[
                 {
                   step: "1",
@@ -250,8 +251,8 @@ export default function Home() {
         </section>
 
         {/* Platforms Section */}
-        <section className="bg-white py-24 border-t border-gray-100">
-          <div className="max-w-6xl mx-auto px-6 lg:px-8 text-center">
+        <section className="bg-white py-24 border-t border-gray-100 flex justify-center w-full">
+          <div className="w-full max-w-6xl px-6 lg:px-8 text-center">
             <h2
               className="font-black text-text"
               style={{ fontSize: "40px", marginBottom: "16px", letterSpacing: "-0.02em" }}

@@ -1,15 +1,25 @@
 import sharp from "sharp";
+import { getEfficientNetEmbedding } from "./efficientNetEmbeddings";
+import { getCNNConditionScores } from "./cnnConditionScorer";
 
 export interface PropertyScore {
-  modernity: number; // 1-10
-  wearAndTear: number; // 1-10 (10 = pristine, 1 = poor condition)
-  lighting: number; // 1-10
-  overall: number; // 1-10 average
+  modernity: number; // 1-10 (heuristic score)
+  wearAndTear: number; // 1-10 (heuristic score)
+  lighting: number; // 1-10 (heuristic score)
+  overall: number; // 1-10 average (combined heuristic + CNN)
+  efficientNetEmbedding?: number[]; // Optional: EfficientNet feature vector
+  cnnScores?: {
+    // Optional: CNN-based condition scores (ResNet-50)
+    modernity: number;
+    lighting: number;
+    wearAndTear: number;
+    structuralQuality: number;
+  };
 }
 
 /**
  * Analyzes an image buffer and returns quality scores.
- * Uses computer vision metrics as a foundation - ready to be replaced with EfficientNet model.
+ * Combines heuristic scoring with CNN-based assessment.
  */
 export async function scorePropertyImage(
   imageBuffer: Buffer
@@ -24,27 +34,80 @@ export async function scorePropertyImage(
     // Extract RGB statistics
     const stats = calculateImageStats(data, info.channels);
 
-    // Modernity Score (based on color saturation and sharpness)
-    const modernity = calculateModernityScore(stats);
+    // Heuristic scoring (existing method)
+    const heuristicModernity = calculateModernityScore(stats);
+    const heuristicWearAndTear = calculateWearAndTearScore(stats);
+    const heuristicLighting = calculateLightingScore(stats);
+    const heuristicOverall = Math.round(
+      (heuristicModernity + heuristicWearAndTear + heuristicLighting) / 3
+    );
 
-    // Wear and Tear Score (based on texture variance and noise)
-    const wearAndTear = calculateWearAndTearScore(stats);
+    // Attempt to generate CNN condition scores (non-blocking)
+    let cnnScores: {
+      modernity: number;
+      lighting: number;
+      wearAndTear: number;
+      structuralQuality: number;
+    } | undefined;
+    let combinedOverall = heuristicOverall;
 
-    // Lighting Score (based on brightness distribution and contrast)
-    const lighting = calculateLightingScore(stats);
+    try {
+      console.log("Generating CNN condition scores...");
+      cnnScores = await getCNNConditionScores(imageBuffer);
+      console.log("CNN condition scoring applied");
 
-    const overall = Math.round((modernity + wearAndTear + lighting) / 3);
+      // Combine heuristic and CNN scores: 60% heuristic + 40% CNN
+      const cnnAverage = (
+        cnnScores.modernity +
+        cnnScores.lighting +
+        cnnScores.wearAndTear +
+        cnnScores.structuralQuality
+      ) / 4;
+
+      combinedOverall = Math.round(
+        heuristicOverall * 0.6 + cnnAverage * 0.4
+      );
+    } catch (error) {
+      // Don't fail the entire scoring if CNN fails
+      console.warn(
+        "CNN condition scoring failed, using heuristic scores only:",
+        error instanceof Error ? error.message : String(error)
+      );
+    }
+
+    // Attempt to generate EfficientNet embedding (non-blocking)
+    let efficientNetEmbedding: number[] | undefined;
+    try {
+      console.log("Generating EfficientNet embedding for image scoring...");
+      efficientNetEmbedding = await getEfficientNetEmbedding(imageBuffer);
+      console.log(
+        `✓ EfficientNet embedding generated (${efficientNetEmbedding.length} dimensions)`
+      );
+    } catch (error) {
+      // Don't fail the entire scoring if EfficientNet fails
+      console.warn(
+        "EfficientNet embedding generation failed, continuing without it:",
+        error instanceof Error ? error.message : String(error)
+      );
+    }
 
     return {
-      modernity: Math.min(10, Math.max(1, modernity)),
-      wearAndTear: Math.min(10, Math.max(1, wearAndTear)),
-      lighting: Math.min(10, Math.max(1, lighting)),
-      overall: Math.min(10, Math.max(1, overall)),
+      modernity: Math.min(10, Math.max(1, heuristicModernity)),
+      wearAndTear: Math.min(10, Math.max(1, heuristicWearAndTear)),
+      lighting: Math.min(10, Math.max(1, heuristicLighting)),
+      overall: Math.min(10, Math.max(1, combinedOverall)),
+      efficientNetEmbedding,
+      cnnScores,
     };
   } catch (error) {
     console.error("Image scoring error:", error);
     // Return neutral scores on error
-    return { modernity: 5, wearAndTear: 5, lighting: 5, overall: 5 };
+    return {
+      modernity: 5,
+      wearAndTear: 5,
+      lighting: 5,
+      overall: 5,
+    };
   }
 }
 

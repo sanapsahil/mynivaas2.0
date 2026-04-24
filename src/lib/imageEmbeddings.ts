@@ -3,9 +3,9 @@ import sharp from "sharp";
 import { getCachedEmbedding, cacheEmbedding } from "./embeddingCache";
 
 // Configure transformers.js for better compatibility
-env.localModelPath = process.cwd();
-env.allowRemoteModels = true;
-env.allowLocalModels = true;
+(env as any).localModelPath = process.cwd();
+(env as any).allowRemoteModels = true;
+(env as any).allowLocalModels = true;
 
 // Use a small, fast model that's more reliable
 const MODEL_ID = "Xenova/clip-vit-base-patch32";

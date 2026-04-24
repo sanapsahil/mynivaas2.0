@@ -8,7 +8,7 @@ export const maxDuration = 120; // 2 minutes for embedding + search
  * POST /api/search-similar
  * Finds properties with images similar to uploaded photo
  * Body: FormData with 'image' file
- * Query params: ?topK=30&threshold=0.45
+ * Query params: ?topK=30&threshold=0.45&listingType=rent
  */
 export async function POST(request: NextRequest) {
   try {
@@ -19,6 +19,7 @@ export async function POST(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const topK = parseInt(searchParams.get("topK") || "30");
     const threshold = parseFloat(searchParams.get("threshold") || "0.45");
+    const listingType = searchParams.get("listingType") || "rent";
 
     if (!file) {
       return NextResponse.json(
@@ -59,7 +60,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log(`Searching similar to: ${file.name} (topK=${topK}, threshold=${threshold})`);
+    const validListingTypes = ["buy", "rent", "pg"];
+    if (!validListingTypes.includes(listingType)) {
+      return NextResponse.json(
+        { error: `listingType must be one of: ${validListingTypes.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    console.log(`Searching similar properties (listingType=${listingType}): ${file.name} (topK=${topK}, threshold=${threshold})`);
 
     // Convert file to buffer
     const buffer = await file.arrayBuffer();
@@ -82,7 +91,8 @@ export async function POST(request: NextRequest) {
         {
           success: true,
           results: [],
-          message: "No similar properties found. Try adjusting the threshold or upload a different image.",
+          listingType,
+          message: "No similar properties found. Try adjusting filters or upload a different image.",
           stats: {
             querySimilarities: [],
             totalChecked: 0,
@@ -98,10 +108,12 @@ export async function POST(request: NextRequest) {
         success: true,
         results: results.map((r) => ({
           id: r.id,
-          similarity: Number(r.similarity.toFixed(4)), // Round to 4 decimals
+          similarity: Number(r.similarity.toFixed(4)),
           property: r.property,
-          similarityPercentage: Math.round(r.similarity * 100), // For display
+          similarityPercentage: Math.round(r.similarity * 100),
+          listingType: listingType,
         })),
+        listingType,
         stats: {
           matchesFound: results.length,
           topSimilarity: Number(results[0].similarity.toFixed(4)),
@@ -128,9 +140,6 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
-    const { searchSimilarEmbeddings: _, ...vectorStore } = await import(
-      "@/lib/vectorStore"
-    );
     const { getVectorStoreStats } = await import("@/lib/vectorStore");
 
     const stats = await getVectorStoreStats();

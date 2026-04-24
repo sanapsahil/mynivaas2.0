@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "EstateCompare - Compare Real Estate Prices Instantly",
+  title: "MyNivaas - Compare Real Estate Prices Instantly",
   description:
     "Find the best property deals across multiple real estate platforms. Compare prices for buying, renting, and PG accommodations in one place.",
 };
