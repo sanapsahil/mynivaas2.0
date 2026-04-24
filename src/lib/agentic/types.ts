@@ -127,6 +127,66 @@ export interface SentimentOutput {
   sources: string[];
 }
 
+// New feature interfaces for extended intelligence platform
+
+export interface FraudAnalysis {
+  trustScore: number; // 0-100
+  riskLevel: "low" | "medium" | "high";
+  flags: string[];
+  details: {
+    titleDuplicate: boolean;
+    suspiciousKeywords: string[];
+    priceAnomaly: boolean;
+  };
+}
+
+export interface PriceExplanation {
+  reason: string;
+  factors: {
+    name: string;
+    impact: "positive" | "negative" | "neutral";
+    description: string;
+  }[];
+  confidence: number;
+  source: "rule-based" | "openai";
+}
+
+export interface Facility {
+  name: string;
+  type: string;
+  distance: string;
+  category: string;
+}
+
+export interface NeighborhoodReport {
+  location: string;
+  livabilityScore: number;
+  safetyRating: number;
+  summary: string;
+  highlights: string[];
+  facilities: Facility[];
+  amenityScore: number;
+  infrastructureScore: number;
+}
+
+export interface MarketInsights {
+  location: string;
+  priceTrend: "up" | "down" | "stable";
+  trendMagnitude: number;
+  demandLevel: "high" | "medium" | "low";
+  investmentRating: "excellent" | "good" | "moderate" | "caution";
+  summary: string;
+  insights: string[];
+}
+
+export interface RecommendationResult {
+  propertyId: string;
+  matchScore: number;
+  matchReasons: string[];
+  mismatchReasons: string[];
+  priority: "high" | "medium" | "low";
+}
+
 export interface AgenticEvaluation {
   fairValue: ValuationOutput;
   forecast: ForecastOutput;
@@ -148,4 +208,10 @@ export interface AgenticEvaluation {
       notes: string;
     }>;
   };
+  // Extended intelligence features (optional)
+  fraudAnalysis?: FraudAnalysis;
+  priceExplanation?: PriceExplanation;
+  neighborhoodReport?: NeighborhoodReport;
+  marketInsights?: MarketInsights;
+  recommendations?: RecommendationResult[];
 }

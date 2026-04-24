@@ -229,3 +229,64 @@ export async function runAgenticEvaluation(
     },
   };
 }
+
+// ===== EXTENDED INTELLIGENCE FEATURES (v2) =====
+// These features extend the orchestrator without breaking backward compatibility
+
+import {
+  gatherExtendedIntelligence,
+  OrchestratorPropertyInput as ExtendedPropertyInput,
+} from "./orchestratorExtension";
+import { UserPreferences } from "@/lib/recommendation";
+
+/**
+ * Run agentic evaluation with optional extended intelligence features
+ * Fully backward compatible - returns same structure as before
+ * New features available as optional fields in evaluation result
+ */
+export async function runAgenticEvaluationWithExtendedIntelligence(
+  goalInput: UserGoalInput,
+  property: OrchestratorPropertyInput,
+  peers: OrchestratorPropertyInput[] = [],
+  options?: {
+    enableExtendedFeatures?: boolean;
+    marketAverage?: number;
+    userPreferences?: UserPreferences;
+  }
+): Promise<{
+  planner: ReturnType<typeof planGoal>;
+  evaluation: AgenticEvaluation;
+}> {
+  // Run standard evaluation first
+  const result = await runAgenticEvaluation(goalInput, property, peers);
+
+  // Optionally augment with extended intelligence
+  if (options?.enableExtendedFeatures) {
+    try {
+      const extendedIntel = await gatherExtendedIntelligence(
+        property as any,
+        {
+          otherTitles: peers.map((p) => p.title),
+          marketAverage: options.marketAverage,
+          enableFraud: true,
+          enablePriceExplanation: true,
+          enableNeighborhood: true,
+          enableMarketInsights: true,
+        }
+      );
+
+      // Merge extended features into evaluation (optional fields)
+      result.evaluation.fraudAnalysis = extendedIntel.fraudAnalysis;
+      result.evaluation.priceExplanation = extendedIntel.priceExplanation;
+      result.evaluation.neighborhoodReport = extendedIntel.neighborhoodReport;
+      result.evaluation.marketInsights = extendedIntel.marketInsights;
+    } catch (error) {
+      console.warn(
+        "Extended intelligence features failed, continuing with standard evaluation:",
+        error
+      );
+    }
+  }
+
+  return result;
+}

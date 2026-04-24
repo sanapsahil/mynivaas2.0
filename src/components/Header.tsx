@@ -28,7 +28,7 @@ export default function Header() {
             </span>
           </Link>
 
-          <nav className="hidden md:flex items-center gap-8">
+          <nav className="hidden md:flex items-center gap-4">
             <Link
               href="/"
               className="text-sm font-medium text-text-muted hover:text-primary transition-colors"
@@ -41,6 +41,52 @@ export default function Header() {
             >
               How it Works
             </a>
+            
+            {/* AI Features Dropdown/Menu */}
+            <div className="flex items-center gap-2 ml-4 pl-4 border-l border-gray-200">
+              <div className="relative group">
+                <button className="text-sm font-medium text-primary hover:text-primary-dark transition-colors flex items-center gap-1">
+                  🤖 AI Tools
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                  </svg>
+                </button>
+                
+                {/* Dropdown Menu */}
+                <div className="absolute left-0 mt-0 w-56 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 py-2 z-10">
+                  <Link
+                    href="/ai/fraud-detection"
+                    className="block px-4 py-2 text-sm text-text-muted hover:bg-gray-50 hover:text-primary transition-colors"
+                  >
+                    🛡️ Fraud Detection
+                  </Link>
+                  <Link
+                    href="/ai/price-explanation"
+                    className="block px-4 py-2 text-sm text-text-muted hover:bg-gray-50 hover:text-primary transition-colors"
+                  >
+                    💰 Why This Price
+                  </Link>
+                  <Link
+                    href="/ai/neighborhood"
+                    className="block px-4 py-2 text-sm text-text-muted hover:bg-gray-50 hover:text-primary transition-colors"
+                  >
+                    🏘️ Neighborhood Report
+                  </Link>
+                  <Link
+                    href="/ai/market-insights"
+                    className="block px-4 py-2 text-sm text-text-muted hover:bg-gray-50 hover:text-primary transition-colors"
+                  >
+                    📊 Market Insights
+                  </Link>
+                  <Link
+                    href="/ai/recommendations"
+                    className="block px-4 py-2 text-sm text-text-muted hover:bg-gray-50 hover:text-primary transition-colors"
+                  >
+                    ⭐ Recommendations
+                  </Link>
+                </div>
+              </div>
+            </div>
           </nav>
         </div>
       </div>
